@@ -6,6 +6,8 @@ https://page.math.tu-berlin.de/~kant/teaching/hess/krypto-ws2006/des.htm
 https://en.wikipedia.org/wiki/DES_supplementary_material#Key_Generation
 """
 
+import argparse
+
 IP: list[list[int]] = [[58, 50, 42, 34, 26, 18, 10, 2],
                        [60, 52, 44, 36, 28, 20, 12, 4],
                        [62, 54, 46, 38, 30, 22, 14, 6],
@@ -14,6 +16,15 @@ IP: list[list[int]] = [[58, 50, 42, 34, 26, 18, 10, 2],
                        [59, 51, 43, 35, 27, 19, 11, 3],
                        [61, 53, 45, 37, 29, 21, 13, 5],
                        [63, 55, 47, 39, 31, 23, 15, 7]]
+
+FINAL_IP: list[list[int]] = [[40, 8, 48, 16, 56, 24, 64, 32],
+							 [39, 7, 47, 15, 55, 23, 63, 31],
+							 [38, 6, 46, 14, 54, 22, 62, 30],
+							 [37, 5, 45, 13, 53, 21, 61, 29],
+							 [36, 4, 44, 12, 52, 20, 60, 28],
+							 [35, 3, 43, 11, 51, 19, 59, 27],
+							 [34, 2, 42, 10, 50, 18, 58, 26],
+							 [33, 1, 41,  9, 49, 17, 57, 25]]
 
 PC_1: list[list[int]] = [[57, 49, 41, 33, 25, 17,  9],
                          [1 , 58, 50, 42, 34, 26, 18],
@@ -43,6 +54,11 @@ EXPANSION_TABLE: list[list[int]] = [[32,  1,  2,  3,  4,  5],
                                     [28, 29, 30, 31, 32,  1]]
 
 BIT_ROTATION_TABLE: list[int] = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1]
+
+PERMUTATION = [[16,  7, 20, 21, 29, 12, 28, 17],
+               [ 1, 15, 23, 26,  5, 18, 31, 10],
+               [ 2,  8, 24, 14, 32, 27,  3,  9],
+               [19, 13, 30,  6, 22, 11,  4, 25]]
 
 S_BOXES = [[[14,  4, 13, 1,  2, 15, 11,  8,  3, 10,  6, 12,  5,  9, 0, 7 ],
           	[ 0, 15,  7, 4, 14,  2, 13,  1, 10,  6, 12, 11,  9,  5, 3, 8 ],
@@ -86,44 +102,39 @@ S_BOXES = [[[14,  4, 13, 1,  2, 15, 11,  8,  3, 10,  6, 12,  5,  9, 0, 7 ],
 
 
 class DES:
-    def __init__(self, plain_text: str, key: str):
-        self._plain_text = plain_text
-        self._key = key
-        self._verbose = False
+    def __init__(self, key: str):
+        self.__key = key
+        self.__subkeys = self.__generate16Subkeys(self.__splitIntoGroup(self.__toByteArray(self.__key, base=16), block=8))
 
-    @property
-    def plain_text() -> str:
-        return self._plain_text
+    def __toBin(self, val: int) -> str:
+        return "{0:04b}" .format(val)
 
-    @property
-    def key() -> str:
-        return self._key
+    def __toStr(self, val: list[str]) -> str:
+        return " ".join(val)
 
-    @plain_text.setter
-    def plain_text(self, val: str) -> None:
-        self._plain_text = plain_text
+    def __toByteArray(self, text: str, *, base: int) -> list[str]:
+        return [self.__toBin(int(i, base)) for i in text]
 
-    @key.setter
-    def key(self, val: str) -> None:
-        self._key = key
-
-    def toByteArray(self, text: str, *, base: int) -> list[str]:
-        return ["{0:04b}".format(int(i, base)) for i in text]
+    def __generateSubkeys(self):
+        if self.__mode == 1:
+            self.__subkeys = self.__subkeys[::-1]
 
     def __getBitPermutation(self, _bytearray: list[str], bit_table: str):
         table = None
 
-        if bit_table == 'PC_1':
-            table = PC_1
-        elif bit_table == 'PC_2':
-            table = PC_2
-        elif bit_table == 'IP':
-            table = IP
-        elif bit_table == 'E':
-            table = EXPANSION_TABLE
-        else:
-            print(f"{bit_table} does not recognized")
-            return
+        match bit_table:
+            case 'PC_1':
+                table = PC_1
+            case 'PC_2':
+                table = PC_2
+            case 'IP':
+                table = IP
+            case 'E':
+                table = EXPANSION_TABLE
+            case 'P':
+                table = PERMUTATION
+            case 'FINAL_IP':
+                table = FINAL_IP
 
         result: list[str] = []
         text = "".join(_bytearray)
@@ -137,12 +148,13 @@ class DES:
 
     def __shiftCircular(self, _bytearray: list[str]) -> list[list[str]]:
         k = "".join(_bytearray)
-        result: list[str] = [k]
+        result: list[str] = []
 
         key_list = [i for i in k]
         for index, shiftval in enumerate(BIT_ROTATION_TABLE):
             for j in range(shiftval):
                 key_list.append(key_list.pop(0))
+
             result.append("".join(key_list))
         
         return result
@@ -156,7 +168,7 @@ class DES:
         C0_Subkeys = self.__shiftCircular(C0)
         D0_Subkeys = self.__shiftCircular(D0)
 
-        key_pairs = list(map(lambda x: "".join(x), zip(C0_Subkeys[1:], D0_Subkeys[1:])))
+        key_pairs = list(map(lambda x: "".join(x), zip(C0_Subkeys, D0_Subkeys)))
         key_48BitPermutations = []
         for key_pair in key_pairs:
             key_48BitPermutations.append(self.__splitIntoGroup(self.__getBitPermutation(key_pair, 'PC_2'), block=6))
@@ -176,8 +188,17 @@ class DES:
 
         return result
 
-    def __feistel(self, _bytearray: list[str], subkey: list[str]):
-        return self.__splitIntoGroup(self.__xor(_bytearray, subkey), block=6)
+    def __feistel(self, r: list[str], k: list[str]):
+        expandedR = self.__expansion(r)
+        a = self.__splitIntoGroup(self.__xor(expandedR, k), block=6)
+        result = []
+
+        for itr, val in enumerate(a):
+            row = int(val[0] + val[-1], 2)
+            col = int(val[1:-1], 2)
+            result.append(self.__toBin(S_BOXES[itr][row][col]))
+
+        return self.__splitIntoGroup(self.__getBitPermutation(result, 'P'), block=4)
 
     def __xor(self, _x1, _x2):
         x1 = "".join(_x1)
@@ -192,60 +213,45 @@ class DES:
     def __expansion(self, _bytearray: list[str]):
         return self.__getBitPermutation(_bytearray, 'E')
 
-    def __keyMixing(self, l: list[str], r: list[str], subkey: list[str]):
-        expandedL = self.__expansion(l)
-        expandedR = self.__expansion(r)
-
-        return r, self.__splitIntoGroup(self.__xor(expandedL, self.__feistel(expandedR, subkey)), block=4)
-
-    def __encode64BitBlockOfData(self, subkeys: list[list[str]]):
-        msg_64BitPermutation = self.__splitIntoGroup(self.__getBitPermutation(self.toByteArray(self._plain_text, base=16), 'IP'), block=4)
+    def __64BitBlockOfData(self, text: str, subkeys: list[list[str]]) -> list[str]:
+        msg_64BitPermutation = self.__splitIntoGroup(self.__getBitPermutation(self.__toByteArray(text, base=16), 'IP'), block=4)
 
         l = msg_64BitPermutation[:len(msg_64BitPermutation)//2]
         r = msg_64BitPermutation[len(msg_64BitPermutation)//2:]
 
-        for i in range(16):
-            l, r = self.__keyMixing(l, r, subkeys[i])
-            print("iteration " + str(i+1))
-            print("L: ", *l)
-            print("R: ", *r)
- 
+        for i in range(0, 16):
+            l, r = r, self.__splitIntoGroup(self.__xor(l, self.__feistel(r, subkeys[i])), block=4)
 
-    def encrypt(self, verbose: bool=False):
-        self._verbose = verbose
-        
-        k = self.__splitIntoGroup(self.toByteArray(self._key, base=16), block=8)
-        subkeys = self.__generate16Subkeys(k)
-        
-        self.__encode64BitBlockOfData(subkeys)
+        return self.__getBitPermutation(self.__splitIntoGroup(r+l, block=8), 'FINAL_IP')
 
-def main():
-    plain_text = "0123456789ABCDEF"
-    key = "133457799BBCDFF1"
+    def __run(self, text: str) -> str:
+        output = self.__splitIntoGroup(self.__64BitBlockOfData(text, self.__subkeys), block=4)
 
-    #M = Text2ByteArray(plain_text, 16)
-    #L = M[:len(M)//2]
-    #R = M[len(M)//2:]
+        return "".join(["{:X}".format(int(i, 2)) for i in output])
 
+    def encrypt(self, text: str):
+        return self.__run(text)
 
-    des = DES(plain_text, key)
-    des.encrypt()
-    
-    """
+    def decrypt(self, text: str):
+        self.__subkeys = self.__subkeys[::-1]
+        return self.__run(text)
 
-    \""" CREATE 16 SUBKEYS, EACH OF WHICH IS 48-BITS LONG \"""
-    print(key_48BitPermutations)
-    
-    \""" ENCODE EACH 64-bit BLOCK OF DATA \"""
-    msg_64BitPermutation = Get64BitPermutation("".join(M))
-    L = msg_64BitPermutation[:len(msg_64BitPermutation)//2]
-    R = msg_64BitPermutation[len(msg_64BitPermutation)//2:]
-    
-    for i in range(1, 16):
-        L, R = R, F(R, key_pairs[i-1])
-    """
-    
+def main(args):
+    des = DES(args.key)
+
+    if args.mode == 0:
+        output = des.encrypt(args.text)
+        print(f"ENCRYPT: {args.text} ==> {output}")
+    elif args.mode == 1:
+        output = des.decrypt(args.text)
+        print(f"DECRYPT: {args.text} ==> {output}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--text', type=str, help="Enter a text")
+    parser.add_argument('--key', type=str, help="Enter a key")
+    parser.add_argument('--mode', metavar="encrypt | decrypt", type=int, help="encrypt=0, decrypt=1")
+    args = parser.parse_args()
+
+    main(args)
 
