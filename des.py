@@ -248,9 +248,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--text', type=str, help="Enter a text")
-    parser.add_argument('--key', type=str, help="Enter a key")
-    parser.add_argument('--mode', metavar="encrypt | decrypt", type=int, help="encrypt=0, decrypt=1")
+    parser.add_argument('--text', type=str, help="Enter a text", required=True)
+    parser.add_argument('--key', type=str, help="Enter a key", required=True)
+    parser.add_argument('--mode', metavar="encrypt | decrypt", type=int, help="encrypt=0, decrypt=1", required=True)
     args = parser.parse_args()
 
     main(args)
