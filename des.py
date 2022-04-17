@@ -115,10 +115,6 @@ class DES:
     def __toByteArray(self, text: str, *, base: int) -> list[str]:
         return [self.__toBin(int(i, base)) for i in text]
 
-    def __generateSubkeys(self):
-        if self.__mode == 1:
-            self.__subkeys = self.__subkeys[::-1]
-
     def __getBitPermutation(self, _bytearray: list[str], bit_table: str):
         table = None
 
